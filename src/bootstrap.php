@@ -168,6 +168,7 @@ function render_header(string $title, string $area): void
     $nav = [];
     if ($user !== null) {
         $nav['user'] = ['/', 'Benutzer-Seite'];
+        $nav['proxmox'] = ['/proxmox.php', 'Proxmox-Info'];
         $nav['profile'] = ['/profile.php', 'Mein Profil'];
         if ($user['role'] === 'admin') {
             $nav['users'] = ['/admin/users.php', 'Admin: Benutzerverwaltung'];
@@ -196,4 +197,37 @@ function render_header(string $title, string $area): void
 function render_footer(): void
 {
     echo '</body></html>';
+}
+
+/**
+ * Ruft python/proxmox_info.py auf und liefert ['ok' => bool, 'data' => array|'error' => string].
+ * Env: PROX_PYTHON (Interpreter, Default python3); weitere Variablen siehe README.
+ */
+function proxmox_fetch(): array
+{
+    $script = realpath(__DIR__ . '/../python/proxmox_info.py');
+    if ($script === false) {
+        return ['ok' => false, 'error' => 'Python-Skript nicht gefunden.'];
+    }
+    if (!function_exists('proc_open')) {
+        return ['ok' => false, 'error' => 'proc_open ist in PHP deaktiviert.'];
+    }
+    $python = getenv('PROX_PYTHON') ?: 'python3';
+    $proc = @proc_open([$python, $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    if (!is_resource($proc)) {
+        return ['ok' => false, 'error' => 'Python-Runtime nicht verfügbar (PROX_PYTHON prüfen).'];
+    }
+    $out = (string) stream_get_contents($pipes[1]);
+    $err = (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $code = proc_close($proc);
+    $res = json_decode($out, true);
+    if (!is_array($res) || !isset($res['ok'])) {
+        if ($err !== '') {
+            error_log('proxmox_info.py (exit ' . $code . '): ' . $err);
+        }
+        return ['ok' => false, 'error' => 'Python-Helper lieferte keine gültige Antwort (Python installiert?).'];
+    }
+    return $res;
 }
