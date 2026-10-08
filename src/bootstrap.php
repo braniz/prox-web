@@ -169,6 +169,7 @@ function render_header(string $title, string $area): void
     if ($user !== null) {
         $nav['user'] = ['/', 'Benutzer-Seite'];
         $nav['profile'] = ['/profile.php', 'Mein Profil'];
+        $nav['proxmox'] = ['/proxmox.php', 'Proxmox-Info'];
         if ($user['role'] === 'admin') {
             $nav['users'] = ['/admin/users.php', 'Admin: Benutzerverwaltung'];
             $nav['api'] = ['/admin/api.php', 'Admin: API-Info'];
