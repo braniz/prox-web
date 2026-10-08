@@ -47,3 +47,15 @@ Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4; `data/` muss für den Webserver-Ben
 - Eigene Seite (`/profile.php`): Passwort ändern (aktuelles Passwort, neu, Wiederholung; min. 8 Zeichen).
 - Fehlanmeldungen werden pro IP gedrosselt (5 Versuche, dann 5 Minuten Sperre).
 - Apache: Der bisherige Basic-Auth-Schutz für `/admin` entfällt; `apache/prox-web.conf` sperrt nur noch `data/` und `src/`.
+
+## Proxmox-Integration
+
+- `/proxmox.php` zeigt Cluster-Name/-Status, Nodes (online/offline) und VMs/Container.
+- `src/proxmox.php` ruft `scripts/proxmox_api.py` auf; das Skript fragt die Proxmox-API serverseitig ab
+  (nur Python-Standardbibliothek) und gibt JSON aus. Das Token-Secret verlässt den Server nie.
+- Zugangsdaten werden unter `/admin/api.php` gespeichert (`data/api.json`: Host, Port, Token-ID, Token-Secret).
+  Das API-Token braucht Leserechte (z. B. Rolle `PVEAuditor`).
+- Voraussetzungen: `python3` (unter `/usr/bin`, `/usr/local/bin` oder `/bin`) und PHP-Funktion `proc_open` aktiv.
+- TLS-Zertifikate werden standardmäßig nicht geprüft (selbstsignierte Proxmox-Zertifikate);
+  mit Umgebungsvariable `PROXWEB_VERIFY_SSL=1` wird die Prüfung aktiviert.
+- Fehler (fehlendes Python, fehlende/ungültige Zugangsdaten, API nicht erreichbar) werden auf der Seite angezeigt.
