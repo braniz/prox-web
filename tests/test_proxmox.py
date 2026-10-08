@@ -3,6 +3,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from urllib.parse import urlsplit
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
@@ -36,7 +37,9 @@ class ProxmoxClientTests(unittest.TestCase):
         self.assertEqual(result["resources"], payloads[2])
         self.assertEqual(open_url.call_count, 3)
         request = open_url.call_args_list[0].args[0]
-        self.assertTrue(request.full_url.startswith("https://proxmox.example.test:8006/"))
+        url = urlsplit(request.full_url)
+        self.assertEqual((url.scheme, url.hostname, url.port), ("https", "proxmox.example.test", 8006))
+        self.assertEqual(url.path, "/api2/json/cluster/status")
         self.assertEqual(
             request.get_header("Authorization"),
             "PVEAPIToken=web@pam!readonly=secret",
