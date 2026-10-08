@@ -32,6 +32,9 @@ def _connection_details(config):
     if not 1 <= port <= 65535:
         raise ProxmoxError("Der konfigurierte Proxmox-Port ist ungültig.")
 
+    tls = bool(config.get("tls", True))
+    scheme = "https" if tls else "http"
+
     token_id = str(config.get("token_id", ""))
     token_secret = str(config.get("token_secret", ""))
     if not token_id or not token_secret:
@@ -39,7 +42,7 @@ def _connection_details(config):
     if any(ord(char) < 32 or ord(char) == 127 for char in token_id + token_secret):
         raise ProxmoxError("Die konfigurierten Proxmox-Zugangsdaten sind ungültig.")
 
-    return f"https://{host}:{port}", f"PVEAPIToken={token_id}={token_secret}"
+    return f"{scheme}://{host}:{port}", f"PVEAPIToken={token_id}={token_secret}"
 
 
 def _api_get(base_url, authorization, path):
