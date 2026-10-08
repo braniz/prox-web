@@ -38,13 +38,15 @@ beschreibbar sein (`chown www-data data`). PHP startet `python3 python/proxmox.p
 die API-Zugangsdaten über die Standardeingabe. Der Webserver-Benutzer benötigt daher Zugriff auf
 Python 3 und ausgehenden HTTPS-Zugriff auf den Proxmox-Host. Die TLS-Zertifikatsprüfung bleibt aktiv;
 das Proxmox-Zertifikat muss vom System als vertrauenswürdig erkannt werden. In der Admin-Seite
-`/admin/api.php` Hostname oder IP (ohne Schema), Port und Proxmox-API-Token hinterlegen. Zum lokalen
-Test: `php -S localhost:8000 -t public`.
+`/admin/api.php` Hostname oder IP (ohne Schema), Port, TLS (`ja`/`nein`) und Proxmox-API-Token hinterlegen.
+Zum lokalen Test: `php -S localhost:8000 -t public`.
 
 Der Python-Client nutzt ausschließlich die Python-Standardbibliothek, fragt `/cluster/status`,
 `/nodes` und `/cluster/resources` ab und nimmt keine Änderungen am Cluster vor. Bei fehlender
 Konfiguration oder API-/Netzwerkfehlern erscheint eine konkrete Fehlermeldung anstelle von Dummy-Daten.
 Die Python-Tests lassen sich mit `python3 -m unittest discover -s tests` ausführen.
+
+
 
 ## Anmeldung und Benutzer
 
