@@ -55,6 +55,30 @@ class ProxmoxClientTests(unittest.TestCase):
                 proxmox.fetch_cluster_info({**self.config, "host": "https://example.test"})
         open_url.assert_not_called()
 
+    def test_tls_enabled_by_default_and_uses_https(self):
+        base_url, _ = proxmox._connection_details(self.config)
+        self.assertTrue(base_url.startswith("https://"))
+
+    def test_tls_no_uses_http(self):
+        for value in (False, "nein", "0", "false"):
+            base_url, _ = proxmox._connection_details({**self.config, "tls": value})
+            self.assertTrue(base_url.startswith("http://"), value)
+
+    def test_tls_yes_values_use_https(self):
+        for value in (True, "ja", "1"):
+            base_url, _ = proxmox._connection_details({**self.config, "tls": value})
+            self.assertTrue(base_url.startswith("https://"), value)
+
+    def test_invalid_tls_value_is_a_clear_error(self):
+        with self.assertRaisesRegex(proxmox.ProxmoxError, "TLS-Einstellung"):
+            proxmox._connection_details({**self.config, "tls": "vielleicht"})
+
+    def test_main_reports_error_json_for_incomplete_config(self):
+        with patch("sys.stdin", io.StringIO("{}")), patch("sys.stdout", new_callable=io.StringIO) as out:
+            code = proxmox.main()
+        self.assertEqual(code, 1)
+        self.assertFalse(json.loads(out.getvalue())["success"])
+
 
 if __name__ == "__main__":
     unittest.main()

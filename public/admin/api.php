@@ -11,7 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $new = [
         'host' => trim((string) ($_POST['host'] ?? '')),
-        'port' => (int) ($_POST['port'] ?? 8006),
+        'port' => ((int) ($_POST['port'] ?? 8006) >= 1 && (int) ($_POST['port'] ?? 8006) <= 65535)
+            ? (int) $_POST['port'] : 8006,
         'tls' => (string) ($_POST['tls'] ?? '1') === '1',
         'token_id' => trim((string) ($_POST['token_id'] ?? '')),
         'token_secret' => (string) ($_POST['token_secret'] ?? '') !== ''
@@ -32,8 +33,8 @@ echo '<form method="post"><input type="hidden" name="csrf" value="' . e(csrf_tok
     . '<label>Port <input type="number" name="port" value="' . e((string) ($cfg['port'] ?? 8006)) . '"></label>'
     . '<label>TLS '
     . '<select name="tls">'
-    . '<option value="1"' . (!empty($cfg['tls']) ? ' selected' : '') . '>ja</option>'
-    . '<option value="0"' . (empty($cfg['tls']) ? ' selected' : '') . '>nein</option>'
+    . '<option value="1"' . (api_tls_enabled($cfg) ? ' selected' : '') . '>ja</option>'
+    . '<option value="0"' . (!api_tls_enabled($cfg) ? ' selected' : '') . '>nein</option>'
     . '</select></label>'
     . '<label>Token-ID <input name="token_id" value="' . e((string) ($cfg['token_id'] ?? '')) . '"></label>'
     . '<label>Token-Secret <input type="password" name="token_secret" autocomplete="off" placeholder="'

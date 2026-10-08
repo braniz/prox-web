@@ -36,8 +36,10 @@ Das Projekt befindet sich in der Weiterentwicklung und kann bei Bedarf um weiter
 Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4 und Python 3; `data/` muss für den Webserver-Benutzer
 beschreibbar sein (`chown www-data data`). PHP startet `python3 python/proxmox.py` lokal und übergibt
 die API-Zugangsdaten über die Standardeingabe. Der Webserver-Benutzer benötigt daher Zugriff auf
-Python 3 und ausgehenden HTTPS-Zugriff auf den Proxmox-Host. Die TLS-Zertifikatsprüfung bleibt aktiv;
-das Proxmox-Zertifikat muss vom System als vertrauenswürdig erkannt werden. In der Admin-Seite
+Python 3 und ausgehenden Zugriff auf den Proxmox-Host. Bei TLS `ja` (Standard, auch wenn die Einstellung
+in `data/api.json` fehlt) wird `https://` mit aktiver Zertifikatsprüfung verwendet; das Proxmox-Zertifikat
+muss vom System als vertrauenswürdig erkannt werden. Bei TLS `nein` wird unverschlüsselt `http://` genutzt.
+Die Einstellung wird als `"tls": true|false` in `data/api.json` gespeichert. In der Admin-Seite
 `/admin/api.php` Hostname oder IP (ohne Schema), Port, TLS (`ja`/`nein`) und Proxmox-API-Token hinterlegen.
 Zum lokalen Test: `php -S localhost:8000 -t public`.
 

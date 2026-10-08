@@ -41,6 +41,18 @@ function save_json(string $name, array $data): void
     );
 }
 
+function api_tls_enabled(array $cfg): bool
+{
+    if (!array_key_exists('tls', $cfg)) {
+        return true;
+    }
+    $v = $cfg['tls'];
+    if (is_string($v)) {
+        return in_array(strtolower(trim($v)), ['1', 'true', 'ja', 'yes', 'on'], true);
+    }
+    return !empty($v);
+}
+
 function normalize_user(string $username, array $u): array
 {
     return [

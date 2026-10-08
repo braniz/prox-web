@@ -11,7 +11,7 @@ if (!function_exists('proc_open')) {
     $error = 'Die Python-Komponente kann auf diesem Server nicht gestartet werden.';
 } else {
     $pipes = [];
-    $process = proc_open(
+    $process = @proc_open(
         ['python3', __DIR__ . '/../python/proxmox.py'],
         [
             0 => ['pipe', 'r'],
@@ -52,7 +52,7 @@ echo '<p>Angemeldet als ' . e($user['username']) . ' ('
 
 echo '<p>API-Info: Host ' . e((string) ($config['host'] ?? '—'))
     . ' · Port ' . e((string) ($config['port'] ?? 8006))
-    . ' · TLS ' . e(!empty($config['tls']) ? 'ja' : 'nein') . '</p>';
+    . ' · TLS ' . e(api_tls_enabled($config) ? 'ja' : 'nein') . '</p>';
 
 if ($error !== '') {
     echo '<p role="alert">' . e($error) . '</p>';
@@ -94,5 +94,17 @@ if ($error !== '') {
             continue;
         }
         ++$resourceCount;
-        echo '<tr><td>' . e((string) ($resource['vm*
-
+        echo '<tr><td>' . e((string) ($resource['vmid'] ?? '—')) . '</td><td>'
+            . e((string) ($resource['name'] ?? '—')) . '</td><td>'
+            . e(($resource['type'] ?? '') === 'qemu' ? 'VM' : 'Container') . '</td><td>'
+            . e((string) ($resource['node'] ?? '—')) . '</td><td>'
+            . e((string) ($resource['status'] ?? '—')) . '</td></tr>';
+    }
+    if ($resourceCount === 0) {
+        echo '<tr><td colspan="5">Keine virtuellen Maschinen oder Container gefunden.</td></tr>';
+    }
+    echo '</tbody></table>';
+}
+
+echo '<p><a href="/profile.php">Passwort ändern</a></p>';
+render_footer();
