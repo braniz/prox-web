@@ -53,6 +53,25 @@ function api_tls_enabled(array $cfg): bool
     return !empty($v);
 }
 
+function api_certificate_verification_enabled(array $cfg): bool
+{
+    if (!array_key_exists('verify_certificate', $cfg)) {
+        return true;
+    }
+    $v = $cfg['verify_certificate'];
+    if (is_string($v)) {
+        $normalized = strtolower(trim($v));
+        if (in_array($normalized, ['0', 'false', 'nein', 'no', 'off'], true)) {
+            return false;
+        }
+        if (in_array($normalized, ['1', 'true', 'ja', 'yes', 'on'], true)) {
+            return true;
+        }
+        return true;
+    }
+    return !empty($v);
+}
+
 function normalize_user(string $username, array $u): array
 {
     return [

@@ -52,7 +52,8 @@ echo '<p>Angemeldet als ' . e($user['username']) . ' ('
 
 echo '<p>API-Info: Host ' . e((string) ($config['host'] ?? '—'))
     . ' · Port ' . e((string) ($config['port'] ?? 8006))
-    . ' · TLS ' . e(api_tls_enabled($config) ? 'ja' : 'nein') . '</p>';
+    . ' · TLS ' . e(api_tls_enabled($config) ? 'ja' : 'nein')
+    . ' · Zertifikat prüfen ' . e(api_certificate_verification_enabled($config) ? 'ja' : 'nein') . '</p>';
 
 if ($error !== '') {
     echo '<p role="alert">' . e($error) . '</p>';

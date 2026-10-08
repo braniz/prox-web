@@ -1,5 +1,6 @@
 import io
 import json
+import ssl
 import sys
 import unittest
 from pathlib import Path
@@ -44,6 +45,34 @@ class ProxmoxClientTests(unittest.TestCase):
             request.get_header("Authorization"),
             "PVEAPIToken=web@pam!readonly=secret",
         )
+        context = open_url.call_args_list[0].kwargs["context"]
+        self.assertTrue(context.check_hostname)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+
+    def test_certificate_verification_can_be_disabled_for_https(self):
+        payload = io.BytesIO(json.dumps({"data": []}).encode())
+        with patch("proxmox.urlopen", side_effect=[payload, payload, payload]) as open_url:
+            proxmox.fetch_cluster_info({**self.config, "verify_certificate": False})
+
+        for call in open_url.call_args_list:
+            context = call.kwargs["context"]
+            self.assertFalse(context.check_hostname)
+            self.assertEqual(context.verify_mode, ssl.CERT_NONE)
+
+    def test_missing_certificate_verification_setting_defaults_to_enabled(self):
+        payload = io.BytesIO(json.dumps({"data": []}).encode())
+        with patch("proxmox.urlopen", side_effect=[payload, payload, payload]) as open_url:
+            proxmox.fetch_cluster_info(self.config)
+
+        context = open_url.call_args_list[0].kwargs["context"]
+        self.assertTrue(context.check_hostname)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+
+    def test_invalid_certificate_verification_setting_is_a_clear_error(self):
+        with patch("proxmox.urlopen") as open_url:
+            with self.assertRaisesRegex(proxmox.ProxmoxError, "Zertifikatsprüfung"):
+                proxmox.fetch_cluster_info({**self.config, "verify_certificate": "maybe"})
+        open_url.assert_not_called()
 
     def test_reports_missing_credentials_instead_of_returning_dummy_data(self):
         with self.assertRaisesRegex(proxmox.ProxmoxError, "Zugangsdaten fehlen"):

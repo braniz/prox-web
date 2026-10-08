@@ -4,6 +4,7 @@
 import ipaddress
 import json
 import re
+import ssl
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +12,22 @@ from urllib.request import Request, urlopen
 
 class ProxmoxError(Exception):
     """An expected configuration or Proxmox API error."""
+
+
+def parse_certificate_verification(value):
+    """Interpret the stored certificate-verification flag; a missing value means enabled."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("1", "true", "ja", "yes", "on"):
+            return True
+        if normalized in ("0", "false", "nein", "no", "off", ""):
+            return False
+        raise ProxmoxError(
+            "Die konfigurierte Zertifikatsprüfung ist ungültig (erlaubt: ja/nein)."
+        )
+    return bool(value)
 
 
 def parse_tls(value):
@@ -59,13 +76,22 @@ def _connection_details(config):
     return f"{scheme}://{host}:{port}", f"PVEAPIToken={token_id}={token_secret}"
 
 
-def _api_get(base_url, authorization, path):
+def _api_get(base_url, authorization, path, verify_certificate):
     request = Request(
         base_url + "/api2/json" + path,
         headers={"Authorization": authorization, "Accept": "application/json"},
     )
     try:
-        with urlopen(request, timeout=10) as response:
+        options = {}
+        if base_url.startswith("https://"):
+            if verify_certificate:
+                options["context"] = ssl.create_default_context()
+            else:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                options["context"] = context
+        with urlopen(request, timeout=10, **options) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         raise ProxmoxError(f"Die Proxmox-API antwortete mit HTTP {error.code}.")
@@ -87,10 +113,11 @@ def _api_get(base_url, authorization, path):
 
 def fetch_cluster_info(config):
     base_url, authorization = _connection_details(config)
+    verify_certificate = parse_certificate_verification(config.get("verify_certificate"))
     return {
-        "cluster": _api_get(base_url, authorization, "/cluster/status"),
-        "nodes": _api_get(base_url, authorization, "/nodes"),
-        "resources": _api_get(base_url, authorization, "/cluster/resources"),
+        "cluster": _api_get(base_url, authorization, "/cluster/status", verify_certificate),
+        "nodes": _api_get(base_url, authorization, "/nodes", verify_certificate),
+        "resources": _api_get(base_url, authorization, "/cluster/resources", verify_certificate),
     }
 
 
