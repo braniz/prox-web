@@ -231,7 +231,9 @@ foreach ($nodeGroups as $nodeName => $group) {
         . '</span>'
         . '</summary>'
         . '<div style="padding:.65rem .85rem .8rem;">'
-        . '<table style="margin-top:0.2rem;"><thead><tr><th style="padding:.45rem .6rem;">Name</th><th style="padding:.45rem .6rem;">IP-Adresse</th><th style="padding:.45rem .6rem;">Status</th><th style="padding:.45rem .6rem;">Typ</th><th style="padding:.45rem .6rem;">Update</th></tr></thead><tbody>';
+        . '<table style="margin-top:0.2rem;table-layout:fixed;width:100%;">'
+        . '<colgroup><col style="width:26%"><col style="width:34%"><col style="width:15%"><col style="width:13%"><col style="width:12%"></colgroup>'
+        . '<thead><tr><th style="padding:.45rem .6rem;">Name</th><th style="padding:.45rem .6rem;">IP-Adresse</th><th style="padding:.45rem .6rem;">Status</th><th style="padding:.45rem .6rem;">Typ</th><th style="padding:.45rem .6rem;text-align:center;">Update</th></tr></thead><tbody>';
 
     foreach ($group['items'] as $resource) {
         $typeLabel = match ($resource['type']) {
@@ -259,13 +261,13 @@ foreach ($nodeGroups as $nodeName => $group) {
             'green' => '#16a34a',
             default => '#e2e8f0',
         };
-        $updateCell = '<span title="Update" style="display:inline-block;width:1.1rem;height:1.1rem;border-radius:999px;background:' . e($updateColor) . ';border:1px solid rgba(15,23,42,0.12);vertical-align:middle;"></span>';
+        $updateCell = '<span title="Update" style="display:block;width:1.1rem;height:1.1rem;border-radius:999px;background:' . e($updateColor) . ';border:1px solid rgba(15,23,42,0.12);margin:0 auto;"></span>';
         echo '<tr>'
             . '<td><a href="' . e($href) . '">' . e($resource['name']) . '</a></td>'
             . '<td>' . $ipHtml . '</td>'
             . '<td><span class="status-pill ' . e($statusClass) . '">' . e($resource['status']) . '</span></td>'
             . '<td><span class="tag">' . e($typeLabel) . '</span></td>'
-            . '<td style="text-align:center;">' . $updateCell . '</td>'
+            . '<td style="text-align:center;vertical-align:middle;">' . $updateCell . '</td>'
             . '</tr>';
     }
 

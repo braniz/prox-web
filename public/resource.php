@@ -125,12 +125,12 @@ if (!is_dir($commentStoreDir)) {
 }
 if (file_exists($commentStoreFile)) {
     $commentHistoryText = trim((string) file_get_contents($commentStoreFile));
-    $existingEntries = @file($commentStoreFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (is_array($existingEntries) && $existingEntries !== []) {
-        $hostCommentDraft = trim((string) $existingEntries[0]);
-    }
+}
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && (string) ($_GET['comment'] ?? '') === 'saved') {
+    $hostCommentMessage = 'Kommentar gespeichert.';
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['host_comment_action'])) {
+    csrf_check();
     $hostCommentAction = (string) ($_POST['host_comment_action'] ?? '');
     $hostCommentDraft = trim((string) ($_POST['host_comment_text'] ?? ''));
     if ($hostCommentAction === 'new') {
@@ -145,22 +145,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['host_comment_action']
                 $existingEntries = [];
             }
         }
-        array_unshift($existingEntries, $hostCommentDraft);
-        $writeOk = @file_put_contents($commentStoreFile, implode(PHP_EOL, $existingEntries) . PHP_EOL, LOCK_EX);
-        if ($writeOk !== false) {
-            $hostCommentMessage = 'Kommentar gespeichert.';
-            $hostCommentDraft = '';
-            if (file_exists($commentStoreFile)) {
-                $commentHistoryText = trim((string) file_get_contents($commentStoreFile));
-            }
-        } else {
-            $hostCommentMessage = 'Kommentar konnte nicht gespeichert werden.';
+        $writeOk = true;
+        if (($existingEntries[0] ?? null) !== $hostCommentDraft) {
+            array_unshift($existingEntries, $hostCommentDraft);
+            $writeOk = @file_put_contents($commentStoreFile, implode(PHP_EOL, $existingEntries) . PHP_EOL, LOCK_EX) !== false;
         }
+        if ($writeOk) {
+            redirect('/resource.php?id=' . rawurlencode($id) . '&type=' . rawurlencode($type) . '&node=' . rawurlencode($node) . '&comment=saved');
+        }
+        $hostCommentMessage = 'Kommentar konnte nicht gespeichert werden.';
     }
-}
-
-if ($hostCommentDraft === '' && $hostInfoText !== '') {
-    $hostCommentDraft = $hostInfoText;
 }
 
 $aptUpdateLabel = $aptUpdateText !== '' ? $aptUpdateText : $aptUpdateLoadMessage;
