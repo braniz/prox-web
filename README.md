@@ -28,7 +28,22 @@ Das Projekt befindet sich in der Weiterentwicklung und kann bei Bedarf um weiter
 - `public/admin/api.php` – Adminbereich: API-Info Eingabe
 - `src/bootstrap.php` – gemeinsame Hilfsfunktionen
 - `data/` – JSON-Speicher (für Apache gesperrt)
-- `apache/prox-web.conf` – Beispiel-VirtualHost (inkl. Basic-Auth für `/admin`)
+- `public/login.php`, `public/logout.php` – Anmeldung/Abmeldung (PHP-Sessions)
+- `public/profile.php` – eigene Benutzerseite mit Passwortänderung
+- `apache/prox-web.conf` – Beispiel-VirtualHost (ohne Basic-Auth; `data/` und `src/` gesperrt)
 
 Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4; `data/` muss für den Webserver-Benutzer beschreibbar sein
 (`chown www-data data`). Zum lokalen Test: `php -S localhost:8000 -t public`.
+
+## Anmeldung und Benutzer
+
+- Alle Seiten erfordern eine Anmeldung (Passwörter werden nur mit `password_hash` gespeichert).
+- **Initiale Zugangsdaten: `admin` / `admin`.** Sie werden automatisch angelegt, wenn noch kein Benutzer existiert.
+  Das Passwort **muss** bei der ersten Anmeldung geändert werden; bis dahin wird man auf die Profilseite umgeleitet.
+- Rollen: `admin` (Zugriff auf `/admin/*`) und `user`.
+- Benutzerverwaltung (`/admin/users.php`): Anlegen mit Username, Vorname, Nachname, E-Mail, Passwort und Gruppe;
+  darunter Tabelle `Username | Nachname, Vorname | Email | Gruppenname` mit Löschen-Funktion.
+  Neue Benutzer müssen ihr Passwort bei der ersten Anmeldung ändern. Der letzte Admin kann nicht gelöscht werden.
+- Eigene Seite (`/profile.php`): Passwort ändern (aktuelles Passwort, neu, Wiederholung; min. 8 Zeichen).
+- Fehlanmeldungen werden pro IP gedrosselt (5 Versuche, dann 5 Minuten Sperre).
+- Apache: Der bisherige Basic-Auth-Schutz für `/admin` entfällt; `apache/prox-web.conf` sperrt nur noch `data/` und `src/`.
