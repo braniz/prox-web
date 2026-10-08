@@ -13,6 +13,20 @@ class ProxmoxError(Exception):
     """An expected configuration or Proxmox API error."""
 
 
+def parse_tls(value):
+    """Interpret the stored TLS flag; a missing value means TLS is enabled."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("1", "true", "ja", "yes", "on"):
+            return True
+        if normalized in ("0", "false", "nein", "no", "off", ""):
+            return False
+        raise ProxmoxError("Die konfigurierte TLS-Einstellung ist ungültig (erlaubt: ja/nein).")
+    return bool(value)
+
+
 def _connection_details(config):
     host = str(config.get("host", "")).strip()
     if not host or any(char.isspace() for char in host) or any(char in host for char in "/@?#"):
@@ -32,7 +46,7 @@ def _connection_details(config):
     if not 1 <= port <= 65535:
         raise ProxmoxError("Der konfigurierte Proxmox-Port ist ungültig.")
 
-    tls = bool(config.get("tls", True))
+    tls = parse_tls(config.get("tls"))
     scheme = "https" if tls else "http"
 
     token_id = str(config.get("token_id", ""))
@@ -56,7 +70,9 @@ def _api_get(base_url, authorization, path):
     except HTTPError as error:
         raise ProxmoxError(f"Die Proxmox-API antwortete mit HTTP {error.code}.")
     except (URLError, TimeoutError, OSError):
-        raise ProxmoxError("Die Proxmox-API ist nicht erreichbar. Host, Port und TLS-Zertifikat prüfen.")
+        if base_url.startswith("https://"):
+            raise ProxmoxError("Die Proxmox-API ist nicht erreichbar. Host, Port und TLS-Zertifikat prüfen.")
+        raise ProxmoxError("Die Proxmox-API ist nicht erreichbar. Host und Port prüfen (TLS ist deaktiviert).")
     except (UnicodeDecodeError, json.JSONDecodeError):
         raise ProxmoxError("Die Proxmox-API lieferte eine ungültige Antwort.")
 
