@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'token_secret' => (string) ($_POST['token_secret'] ?? '') !== ''
             ? (string) $_POST['token_secret']
             : (string) ($cfg['token_secret'] ?? ''),
+        'verify_ssl' => !empty($cfg['verify_ssl']),
     ];
     save_json('api', $new);
     $cfg = $new;
