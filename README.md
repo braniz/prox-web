@@ -21,9 +21,10 @@ Dieses Projekt wurde **mithilfe von KI generiert**.
 
 Das Projekt befindet sich in der Weiterentwicklung und kann bei Bedarf um weitere Funktionen ergänzt werden.
 
-## Erste Phase: Apache-Grundgerüst (ohne Proxmox)
+## Proxmox-Clusteransicht
 
-- `public/index.php` – Benutzer-Seite (zeigt nur „wird gearbeitet“)
+- `public/index.php` – angemeldete Benutzer sehen Clusterstatus, Knoten sowie VMs und Container
+- `python/proxmox.py` – Python-Client für die schreibgeschützte Proxmox-API
 - `public/admin/users.php` – Adminbereich: Benutzerverwaltung
 - `public/admin/api.php` – Adminbereich: API-Info Eingabe
 - `src/bootstrap.php` – gemeinsame Hilfsfunktionen
@@ -32,8 +33,18 @@ Das Projekt befindet sich in der Weiterentwicklung und kann bei Bedarf um weiter
 - `public/profile.php` – eigene Benutzerseite mit Passwortänderung
 - `apache/prox-web.conf` – Beispiel-VirtualHost (ohne Basic-Auth; `data/` und `src/` gesperrt)
 
-Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4; `data/` muss für den Webserver-Benutzer beschreibbar sein
-(`chown www-data data`). Zum lokalen Test: `php -S localhost:8000 -t public`.
+Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4 und Python 3; `data/` muss für den Webserver-Benutzer
+beschreibbar sein (`chown www-data data`). PHP startet `python3 python/proxmox.py` lokal und übergibt
+die API-Zugangsdaten über die Standardeingabe. Der Webserver-Benutzer benötigt daher Zugriff auf
+Python 3 und ausgehenden HTTPS-Zugriff auf den Proxmox-Host. Die TLS-Zertifikatsprüfung bleibt aktiv;
+das Proxmox-Zertifikat muss vom System als vertrauenswürdig erkannt werden. In der Admin-Seite
+`/admin/api.php` Hostname oder IP (ohne Schema), Port und Proxmox-API-Token hinterlegen. Zum lokalen
+Test: `php -S localhost:8000 -t public`.
+
+Der Python-Client nutzt ausschließlich die Python-Standardbibliothek, fragt `/cluster/status`,
+`/nodes` und `/cluster/resources` ab und nimmt keine Änderungen am Cluster vor. Bei fehlender
+Konfiguration oder API-/Netzwerkfehlern erscheint eine konkrete Fehlermeldung anstelle von Dummy-Daten.
+Die Python-Tests lassen sich mit `python3 -m unittest discover -s tests` ausführen.
 
 ## Anmeldung und Benutzer
 
