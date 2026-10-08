@@ -47,3 +47,12 @@ Voraussetzungen: Apache 2.4 mit PHP ≥ 7.4; `data/` muss für den Webserver-Ben
 - Eigene Seite (`/profile.php`): Passwort ändern (aktuelles Passwort, neu, Wiederholung; min. 8 Zeichen).
 - Fehlanmeldungen werden pro IP gedrosselt (5 Versuche, dann 5 Minuten Sperre).
 - Apache: Der bisherige Basic-Auth-Schutz für `/admin` entfällt; `apache/prox-web.conf` sperrt nur noch `data/` und `src/`.
+
+## Proxmox-Info
+
+- Seite `/proxmox.php` (für alle angemeldeten Benutzer): Cluster-Name/Quorum, Knoten (online/offline) sowie VMs und Container.
+- Die Abfrage erfolgt ausschließlich serverseitig mit dem unter `/admin/api.php` gespeicherten API-Token
+  (Token-ID im Format `benutzer@realm!tokenname`, Host, Port). Das Secret wird nie im Browser ausgegeben.
+- „TLS-Zertifikat prüfen“ ist standardmäßig aus (Proxmox nutzt oft selbstsignierte Zertifikate); bei gültigem Zertifikat aktivieren.
+- Fehler (API nicht erreichbar, ungültige Zugangsdaten) werden auf der Seite angezeigt.
+- Zusätzliche Voraussetzung: PHP-Erweiterung `curl` (`apt install php-curl`). Der Token braucht Leserechte (z. B. `PVEAuditor`).
