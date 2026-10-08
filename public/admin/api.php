@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require __DIR__ . '/../../src/bootstrap.php';
 
+require_admin();
+
 $cfg = load_json('api');
 $saved = false;
 
