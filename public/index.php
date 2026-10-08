@@ -32,6 +32,7 @@ if (!function_exists('proc_open')) {
         fclose($pipes[1]);
         fclose($pipes[2]);
         proc_close($process);
+
         $result = json_decode($output, true);
 
         if (is_array($result) && !empty($result['success']) && is_array($result['data'] ?? null)) {
@@ -48,6 +49,10 @@ header('Cache-Control: no-store');
 render_header('Proxmox-Cluster', 'user');
 echo '<p>Angemeldet als ' . e($user['username']) . ' ('
     . e(trim($user['firstname'] . ' ' . $user['lastname'])) . ')</p>';
+
+echo '<p>API-Info: Host ' . e((string) ($config['host'] ?? '—'))
+    . ' · Port ' . e((string) ($config['port'] ?? 8006))
+    . ' · TLS ' . e(!empty($config['tls']) ? 'ja' : 'nein') . '</p>';
 
 if ($error !== '') {
     echo '<p role="alert">' . e($error) . '</p>';
@@ -89,17 +94,5 @@ if ($error !== '') {
             continue;
         }
         ++$resourceCount;
-        echo '<tr><td>' . e((string) ($resource['vmid'] ?? '—')) . '</td><td>'
-            . e((string) ($resource['name'] ?? '—')) . '</td><td>'
-            . e(($resource['type'] ?? '') === 'qemu' ? 'VM' : 'Container') . '</td><td>'
-            . e((string) ($resource['node'] ?? '—')) . '</td><td>'
-            . e((string) ($resource['status'] ?? '—')) . '</td></tr>';
-    }
-    if ($resourceCount === 0) {
-        echo '<tr><td colspan="5">Keine virtuellen Maschinen oder Container gefunden.</td></tr>';
-    }
-    echo '</tbody></table>';
-}
-
-echo '<p><a href="/profile.php">Passwort ändern</a></p>';
-render_footer();
+        echo '<tr><td>' . e((string) ($resource['vm*
+
