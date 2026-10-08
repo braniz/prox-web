@@ -50,8 +50,8 @@ class ProxmoxClientTests(unittest.TestCase):
         self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
 
     def test_certificate_verification_can_be_disabled_for_https(self):
-        payload = io.BytesIO(json.dumps({"data": []}).encode())
-        with patch("proxmox.urlopen", side_effect=[payload, payload, payload]) as open_url:
+        payloads = [io.BytesIO(json.dumps({"data": []}).encode()) for _ in range(3)]
+        with patch("proxmox.urlopen", side_effect=payloads) as open_url:
             proxmox.fetch_cluster_info({**self.config, "verify_certificate": False})
 
         for call in open_url.call_args_list:
@@ -60,13 +60,20 @@ class ProxmoxClientTests(unittest.TestCase):
             self.assertEqual(context.verify_mode, ssl.CERT_NONE)
 
     def test_missing_certificate_verification_setting_defaults_to_enabled(self):
-        payload = io.BytesIO(json.dumps({"data": []}).encode())
-        with patch("proxmox.urlopen", side_effect=[payload, payload, payload]) as open_url:
+        payloads = [io.BytesIO(json.dumps({"data": []}).encode()) for _ in range(3)]
+        with patch("proxmox.urlopen", side_effect=payloads) as open_url:
             proxmox.fetch_cluster_info(self.config)
 
         context = open_url.call_args_list[0].kwargs["context"]
         self.assertTrue(context.check_hostname)
         self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+
+    def test_certificate_verification_is_not_used_for_http(self):
+        payloads = [io.BytesIO(json.dumps({"data": []}).encode()) for _ in range(3)]
+        with patch("proxmox.urlopen", side_effect=payloads) as open_url:
+            proxmox.fetch_cluster_info({**self.config, "tls": False, "verify_certificate": False})
+
+        self.assertEqual(open_url.call_args.kwargs, {"timeout": 10})
 
     def test_invalid_certificate_verification_setting_is_a_clear_error(self):
         with patch("proxmox.urlopen") as open_url:

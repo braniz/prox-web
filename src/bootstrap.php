@@ -59,6 +59,9 @@ function api_certificate_verification_enabled(array $cfg): bool
         return true;
     }
     $v = $cfg['verify_certificate'];
+    if ($v === null) {
+        return true;
+    }
     if (is_string($v)) {
         $normalized = strtolower(trim($v));
         if (in_array($normalized, ['0', 'false', 'nein', 'no', 'off'], true)) {
