@@ -46,14 +46,7 @@ if (!function_exists('proc_open')) {
 }
 
 header('Cache-Control: no-store');
-render_header('Proxmox-Cluster', 'user');
-echo '<p>Angemeldet als ' . e($user['username']) . ' ('
-    . e(trim($user['firstname'] . ' ' . $user['lastname'])) . ')</p>';
-
-echo '<p>API-Info: Host ' . e((string) ($config['host'] ?? '—'))
-    . ' · Port ' . e((string) ($config['port'] ?? 8006))
-    . ' · TLS ' . e(api_tls_enabled($config) ? 'ja' : 'nein')
-    . ' · Zertifikat prüfen ' . e(api_certificate_verification_enabled($config) ? 'ja' : 'nein') . '</p>';
+render_header('Übersicht', 'user');
 
 if ($error !== '') {
     echo '<p role="alert">' . e($error) . '</p>';
@@ -67,12 +60,17 @@ if ($error !== '') {
         }
     }
     if (is_array($cluster)) {
-        echo '<h2>Cluster</h2><p>Name: ' . e((string) ($cluster['name'] ?? '—'))
+        echo '<div class="section-card" style="margin-bottom:1rem;">'
+            . '<h2 style="margin:0 0 .35rem;">Cluster</h2>'
+            . '<p style="margin:0;">Name: ' . e((string) ($cluster['name'] ?? '—'))
             . ' · Status: ' . e(!empty($cluster['quorate']) ? 'Quorum vorhanden' : 'Kein Quorum')
-            . ' · Knoten: ' . e((string) ($cluster['nodes'] ?? '—')) . '</p>';
+            . ' · Knoten: ' . e((string) ($cluster['nodes'] ?? '—')) . '</p>'
+            . '</div>';
     }
 
-    echo '<h2>Knoten</h2><table><thead><tr><th>Name</th><th>Status</th><th>CPU</th><th>Arbeitsspeicher</th></tr></thead><tbody>';
+    echo '<div class="section-card">'
+        . '<h2 style="margin:0 0 .35rem;">Knoten</h2>'
+        . '<table><thead><tr><th>Name</th><th>Status</th><th>CPU</th><th>Arbeitsspeicher</th></tr></thead><tbody>';
     foreach ($info['nodes'] ?? [] as $node) {
         $cpu = is_numeric($node['cpu'] ?? null) ? number_format((float) $node['cpu'] * 100, 1) . '%' : '—';
         $memory = is_numeric($node['mem'] ?? null) && is_numeric($node['maxmem'] ?? null)
@@ -86,25 +84,7 @@ if ($error !== '') {
     if (empty($info['nodes'])) {
         echo '<tr><td colspan="4">Keine Knoten gefunden.</td></tr>';
     }
-    echo '</tbody></table>';
-
-    echo '<h2>Virtuelle Maschinen und Container</h2><table><thead><tr><th>ID</th><th>Name</th><th>Typ</th><th>Knoten</th><th>Status</th></tr></thead><tbody>';
-    $resourceCount = 0;
-    foreach ($info['resources'] ?? [] as $resource) {
-        if (!in_array($resource['type'] ?? '', ['qemu', 'lxc'], true)) {
-            continue;
-        }
-        ++$resourceCount;
-        echo '<tr><td>' . e((string) ($resource['vmid'] ?? '—')) . '</td><td>'
-            . e((string) ($resource['name'] ?? '—')) . '</td><td>'
-            . e(($resource['type'] ?? '') === 'qemu' ? 'VM' : 'Container') . '</td><td>'
-            . e((string) ($resource['node'] ?? '—')) . '</td><td>'
-            . e((string) ($resource['status'] ?? '—')) . '</td></tr>';
-    }
-    if ($resourceCount === 0) {
-        echo '<tr><td colspan="5">Keine virtuellen Maschinen oder Container gefunden.</td></tr>';
-    }
-    echo '</tbody></table>';
+    echo '</tbody></table></div>';
 }
 
 render_footer();

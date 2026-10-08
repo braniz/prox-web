@@ -2,50 +2,136 @@
 declare(strict_types=1);
 require __DIR__ . '/../src/bootstrap.php';
 
-function extract_ip_address_value(array $resource): string
+function split_ip_addresses($node): array
 {
-    $candidates = [];
-    foreach (['ip', 'ip-address', 'ip_address', 'ipaddress'] as $key) {
-        if (isset($resource[$key]) && is_scalar($resource[$key]) && (string) $resource[$key] !== '') {
-            $candidates[] = (string) $resource[$key];
-        }
-    }
+    $result = ['ipv4' => [], 'ipv6' => []];
+    $seen = [];
 
-    if (isset($resource['ip_addresses']) && is_array($resource['ip_addresses'])) {
-        foreach ($resource['ip_addresses'] as $value) {
-            if (is_scalar($value) && (string) $value !== '') {
-                $candidates[] = (string) $value;
-            }
+    $add = static function ($value) use (&$result, &$seen): void {
+        if (!is_scalar($value) && !is_array($value)) {
+            return;
         }
-    }
 
-    foreach (['net0', 'net1', 'network', 'net'] as $key) {
-        if (!isset($resource[$key]) || !is_string($resource[$key])) {
-            continue;
+        $text = trim((string) $value);
+        if ($text === '') {
+            return;
         }
-        preg_match_all('/(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]{2,}/', $resource[$key], $matches);
-        foreach ($matches[0] as $match) {
-            if (in_array($match, ['dhcp', 'localhost'], true)) {
+
+        $compact = preg_replace('/\/.*$/', '', $text);
+        $compact = preg_replace('/%.*$/', '', (string) $compact);
+        $compact = trim((string) $compact);
+        if ($compact === '' || !filter_var($compact, FILTER_VALIDATE_IP)) {
+            return;
+        }
+
+        if (preg_match('/^127\./', $compact) || strtolower($compact) === '::1' || preg_match('/^169\.254\./', $compact) || preg_match('/^fe80:/i', $compact)) {
+            return;
+        }
+
+        if (isset($seen[$compact])) {
+            return;
+        }
+        $seen[$compact] = true;
+
+        if (str_contains($compact, ':')) {
+            $result['ipv6'][] = $compact;
+            return;
+        }
+        $result['ipv4'][] = $compact;
+    };
+
+    $extractTextTokens = static function (string $text): array {
+        $candidates = [];
+        foreach (preg_split('/[\s,]+/', $text) as $part) {
+            $part = trim((string) $part);
+            if ($part === '') {
                 continue;
             }
-            if (filter_var($match, FILTER_VALIDATE_IP) !== false) {
-                $candidates[] = $match;
+            $raw = $part;
+            if (str_contains($raw, '=')) {
+                [$key, $value] = array_pad(explode('=', $raw, 2), 2, '');
+                if ($value !== '') {
+                    $raw = $value;
+                }
+            }
+            foreach (preg_split('/[;]+/', $raw) as $candidate) {
+                $candidate = trim((string) $candidate, " \t\n\r\0\x0B[](){}\"'");
+                $clean = preg_replace('/\/.*$/', '', $candidate);
+                $clean = preg_replace('/%.*$/', '', (string) $clean);
+                $clean = trim((string) $clean);
+                if ($clean === '' || !filter_var($clean, FILTER_VALIDATE_IP)) {
+                    continue;
+                }
+                $candidates[] = $clean;
             }
         }
-    }
+        return array_values(array_unique($candidates));
+    };
 
-    $seen = [];
-    $clean = [];
-    foreach ($candidates as $candidate) {
-        $trimmed = trim((string) $candidate);
-        if ($trimmed === '' || isset($seen[$trimmed])) {
-            continue;
+    $walk = static function ($value) use (&$walk, $add, $extractTextTokens): void {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $keyLower = strtolower((string) $key);
+                if (strpos($keyLower, 'ip') !== false || in_array($keyLower, ['net0', 'net1', 'network', 'net'], true)) {
+                    if (is_array($item)) {
+                        foreach ($item as $subItem) {
+                            $add($subItem);
+                        }
+                    } else {
+                        $add($item);
+                    }
+                }
+                if (is_array($item)) {
+                    $walk($item);
+                }
+            }
+            return;
         }
-        $seen[$trimmed] = true;
-        $clean[] = $trimmed;
+
+        if (is_string($value)) {
+            foreach ($extractTextTokens($value) as $candidate) {
+                if (in_array(strtolower((string) $candidate), ['dhcp', 'localhost'], true)) {
+                    continue;
+                }
+                $add($candidate);
+            }
+        }
+    };
+
+    $walk($node);
+    return $result;
+}
+
+function apt_update_state(string $text): string
+{
+    $dates = [];
+    preg_match_all('/\b(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}|\d{4}\/\d{2}\/\d{2}|\d{2}\/\d{2}\/\d{4})\b/', $text, $matches);
+    foreach (($matches[1] ?? []) as $candidateDate) {
+        $parsed = null;
+        foreach (['Y-m-d', 'd.m.Y', 'Y/m/d', 'd/m/Y'] as $format) {
+            $date = DateTime::createFromFormat('!' . $format, $candidateDate);
+            if ($date instanceof DateTime) {
+                $parsed = $date->getTimestamp();
+                break;
+            }
+        }
+        if ($parsed !== null) {
+            $dates[] = $parsed;
+        }
     }
 
-    return implode(', ', $clean);
+    if ($dates === []) {
+        return 'neutral';
+    }
+
+    $ageDays = (int) floor((time() - max($dates)) / 86400);
+    if ($ageDays >= 40) {
+        return 'red';
+    }
+    if ($ageDays >= 30) {
+        return 'yellow';
+    }
+    return 'green';
 }
 
 $user = require_login();
@@ -67,7 +153,24 @@ foreach ($info['resources'] ?? [] as $resource) {
         continue;
     }
 
-    $ip = extract_ip_address_value($resource);
+    $ips = split_ip_addresses($resource);
+    if ((empty($ips['ipv4']) && empty($ips['ipv6'])) && in_array($type, ['qemu', 'lxc'], true)) {
+        $detail = fetch_proxmox_data($config, ['node' => $resource['node'], 'vmid' => $resource['vmid'], 'type' => $resource['type']]);
+        if ($detail['success']) {
+            $guestAgent = $detail['data']['guest_agent'] ?? [];
+            if (empty($guestAgent) && isset($detail['data']['guest_cmds']['network'])) {
+                $guestAgent = json_decode((string) $detail['data']['guest_cmds']['network'], true);
+            }
+            $ips = split_ip_addresses($guestAgent);
+        }
+    }
+
+    $updateText = '';
+    $updateData = fetch_proxmox_data($config, ['node' => (string) ($resource['node'] ?? ''), 'vmid' => (string) ($resource['vmid'] ?? ''), 'type' => $type, 'read_file' => '/srv/info/apt_update_info']);
+    if ($updateData['success'] && is_array($updateData['data'] ?? null)) {
+        $updateText = trim((string) ($updateData['data']['host_info'] ?? ''));
+    }
+    ensure_red_update_kanban_task((string) ($resource['vmid'] ?? ''), (string) ($resource['node'] ?? ''), (string) ($resource['name'] ?? ''), $updateText);
 
     $resources[] = [
         'node' => (string) ($resource['node'] ?? '—'),
@@ -75,37 +178,102 @@ foreach ($info['resources'] ?? [] as $resource) {
         'vmid' => (string) ($resource['vmid'] ?? ''),
         'type' => $type,
         'status' => (string) ($resource['status'] ?? '—'),
-        'ip' => $ip,
+        'ipv4' => $ips['ipv4'],
+        'ipv6' => $ips['ipv6'],
+        'update_state' => apt_update_state($updateText),
     ];
 }
 
 usort($resources, static function (array $a, array $b): int {
-    return strcmp($a['node'] . ':' . $a['name'], $b['node'] . ':' . $b['name']);
+    return strcmp($a['node'] . ':' . $a['name'], $b['node'] . ':' . $a['name']);
 });
 
-render_header('VMs / LXC / Docker', 'resources');
-echo '<p>Alle virtuellen Maschinen, Container und potenziell zugeordneten Docker-Instanzen aus Proxmox.</p>';
-
-echo '<table><thead><tr><th>Knoten</th><th>Name</th><th>IP-Adresse</th><th>Status</th><th>Typ</th></tr></thead><tbody>';
+$nodeGroups = [];
 foreach ($resources as $resource) {
-    $typeLabel = match ($resource['type']) {
-        'qemu' => 'VM',
-        'lxc' => 'LXC',
-        'docker' => 'Docker',
-        default => 'Unbekannt',
-    };
-    $href = '/resource.php?id=' . rawurlencode((string) $resource['vmid']) . '&type=' . rawurlencode($resource['type']) . '&node=' . rawurlencode($resource['node']);
-    echo '<tr>'
-        . '<td>' . e($resource['node']) . '</td>'
-        . '<td><a href="' . e($href) . '">' . e($resource['name']) . '</a></td>'
-        . '<td>' . e($resource['ip'] !== '' ? $resource['ip'] : '—') . '</td>'
-        . '<td>' . e($resource['status']) . '</td>'
-        . '<td>' . e($typeLabel) . '</td>'
-        . '</tr>';
+    $nodeName = $resource['node'];
+    if (!isset($nodeGroups[$nodeName])) {
+        $nodeGroups[$nodeName] = [
+            'items' => [],
+            'total' => 0,
+            'running' => 0,
+            'stopped' => 0,
+            'vm' => 0,
+            'container' => 0,
+        ];
+    }
+    $nodeGroups[$nodeName]['items'][] = $resource;
+    ++$nodeGroups[$nodeName]['total'];
+    $status = strtolower((string) $resource['status']);
+    if (in_array($status, ['running', 'online', 'active'], true)) {
+        ++$nodeGroups[$nodeName]['running'];
+    } else {
+        ++$nodeGroups[$nodeName]['stopped'];
+    }
+    if ($resource['type'] === 'qemu') {
+        ++$nodeGroups[$nodeName]['vm'];
+    }
+    if ($resource['type'] === 'lxc') {
+        ++$nodeGroups[$nodeName]['container'];
+    }
 }
+ksort($nodeGroups);
+
+render_header('VMs / LXC / Docker', 'resources');
+
+foreach ($nodeGroups as $nodeName => $group) {
+    echo '<details class="section-card" open style="margin-top:.65rem;padding:0;overflow:hidden;">'
+        . '<summary style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;cursor:pointer;list-style:none;padding:.75rem .85rem;background:#f8fafc;border-bottom:1px solid #dfe7f1;">'
+        . '<span style="font-weight:700;font-size:1.05rem;">Knoten: ' . e($nodeName) . '</span>'
+        . '<span style="display:flex;gap:.4rem;flex-wrap:wrap;">'
+        . '<span class="tag" style="background:#eef2ff;color:#4338ca;">Gesamt ' . e((string) $group['total']) . '</span>'
+        . '<span class="tag" style="background:#ecfdf5;color:#166534;">Laufend ' . e((string) $group['running']) . '</span>'
+        . '<span class="tag" style="background:#fef2f2;color:#991b1b;">Gestoppt ' . e((string) $group['stopped']) . '</span>'
+        . '</span>'
+        . '</summary>'
+        . '<div style="padding:.65rem .85rem .8rem;">'
+        . '<table style="margin-top:0.2rem;"><thead><tr><th style="padding:.45rem .6rem;">Name</th><th style="padding:.45rem .6rem;">IP-Adresse</th><th style="padding:.45rem .6rem;">Status</th><th style="padding:.45rem .6rem;">Typ</th><th style="padding:.45rem .6rem;">Update</th></tr></thead><tbody>';
+
+    foreach ($group['items'] as $resource) {
+        $typeLabel = match ($resource['type']) {
+            'qemu' => 'VM',
+            'lxc' => 'LXC',
+            'docker' => 'Docker',
+            default => 'Unbekannt',
+        };
+        $href = '/resource.php?id=' . rawurlencode((string) $resource['vmid']) . '&type=' . rawurlencode($resource['type']) . '&node=' . rawurlencode($resource['node']);
+        $ipHtml = '—';
+        if (!empty($resource['ipv4']) || !empty($resource['ipv6'])) {
+            $parts = [];
+            if (!empty($resource['ipv4'])) {
+                $parts[] = 'IPv4: ' . e(implode(', ', $resource['ipv4']));
+            }
+            if (!empty($resource['ipv6'])) {
+                $parts[] = 'IPv6: ' . e(implode(', ', $resource['ipv6']));
+            }
+            $ipHtml = '<div>' . implode('<br>', $parts) . '</div>';
+        }
+        $statusClass = strtolower((string) $resource['status']) === 'running' ? '' : 'stopped';
+        $updateColor = match ($resource['update_state']) {
+            'red' => '#dc2626',
+            'yellow' => '#f59e0b',
+            'green' => '#16a34a',
+            default => '#e2e8f0',
+        };
+        $updateCell = '<span title="Update" style="display:inline-block;width:1.1rem;height:1.1rem;border-radius:999px;background:' . e($updateColor) . ';border:1px solid rgba(15,23,42,0.12);vertical-align:middle;"></span>';
+        echo '<tr>'
+            . '<td><a href="' . e($href) . '">' . e($resource['name']) . '</a></td>'
+            . '<td>' . $ipHtml . '</td>'
+            . '<td><span class="status-pill ' . e($statusClass) . '">' . e($resource['status']) . '</span></td>'
+            . '<td><span class="tag">' . e($typeLabel) . '</span></td>'
+            . '<td style="text-align:center;">' . $updateCell . '</td>'
+            . '</tr>';
+    }
+
+    echo '</tbody></table></div></details>';
+}
+
 if ($resources === []) {
-    echo '<tr><td colspan="5">Keine VMs, LXC-Container oder Docker-Objekte gefunden.</td></tr>';
+    echo '<div class="section-card" style="margin-top:1rem;"><p>Keine VMs, LXC-Container oder Docker-Objekte gefunden.</p></div>';
 }
-echo '</tbody></table>';
 
 render_footer();
