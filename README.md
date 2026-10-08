@@ -1,24 +1,22 @@
 # prox-web
 
-**prox-web** ist ein Webprojekt für **Proxmox**. Es liefert Informationen über das **Proxmox-Cluster** sowie über die darin laufenden **VMs** direkt im Browser.
+**prox-web** ist eine webbasierte Anwendung zur Anzeige und Verwaltung von Informationen rund um ein **Proxmox-Cluster**. Das Projekt stellt zentrale Daten zu **Hosts**, **VMs** und dem **Cluster-Status** in einer übersichtlichen Oberfläche dar.
 
-## Überblick
+## Funktionen
 
-Dieses Projekt wurde entwickelt, um einen schnellen und übersichtlichen Zugriff auf wichtige Proxmox-Informationen zu ermöglichen. Dazu gehören je nach Implementierung zum Beispiel:
+- Übersicht über das Proxmox-Cluster
+- Anzeige relevanter Informationen zu virtuellen Maschinen
+- Zentrale Weboberfläche für den schnellen Zugriff auf Cluster-Daten
+- Klar strukturierte Darstellung für eine einfache Nutzung
 
-- Cluster-Status
-- VM-Übersicht
-- Laufende Systeme und deren Zustand
-- Zentrale Webansicht für Proxmox-Daten
+## Ziel des Projekts
 
-## Hinweis zur Entstehung
+Ziel von **prox-web** ist es, wichtige Informationen aus der Proxmox-Umgebung schnell und komfortabel im Browser verfügbar zu machen. Dadurch soll die Verwaltung und Überwachung des Clusters vereinfacht werden.
 
-Dieses Projekt bzw. diese Dokumentation wurde **mit Hilfe von KI generiert**.
+## Hinweis
 
-## Ziel
+Dieses Projekt wurde **mithilfe von KI generiert**.
 
-Das Ziel von **prox-web** ist es, Proxmox-Informationen in einer einfachen Weboberfläche darzustellen und so den Alltag bei der Verwaltung des Clusters zu erleichtern.
+## Projektstatus
 
----
-
-> Hinweis: Diese README wurde generiert und kann bei Bedarf jederzeit erweitert oder an das tatsächliche Feature-Set des Projekts angepasst werden.
+Das Projekt befindet sich in der Weiterentwicklung und kann bei Bedarf um weitere Funktionen ergänzt werden.
