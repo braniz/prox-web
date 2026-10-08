@@ -107,5 +107,4 @@ if ($error !== '') {
     echo '</tbody></table>';
 }
 
-echo '<p><a href="/profile.php">Passwort ändern</a></p>';
 render_footer();

@@ -196,38 +196,116 @@ function csrf_check(): void
     }
 }
 
+function fetch_proxmox_data(array $config, ?array $guest = null): array
+{
+    if (!function_exists('proc_open')) {
+        return ['success' => false, 'error' => 'Die Python-Komponente kann auf diesem Server nicht gestartet werden.'];
+    }
+
+    $payload = $config;
+    if (is_array($guest)) {
+        $payload['guest'] = $guest;
+    }
+
+    $pipes = [];
+    $process = @proc_open(
+        ['python3', __DIR__ . '/../python/proxmox.py'],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes,
+        dirname(__DIR__)
+    );
+
+    if (!is_resource($process)) {
+        return ['success' => false, 'error' => 'Die Python-Komponente kann auf diesem Server nicht gestartet werden.'];
+    }
+
+    $input = json_encode($payload);
+    fwrite($pipes[0], $input === false ? '{}' : $input);
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($process);
+
+    $result = json_decode((string) $output, true);
+    if (!is_array($result)) {
+        return ['success' => false, 'error' => 'Die Cluster-Informationen konnten nicht geladen werden.'];
+    }
+
+    if (!empty($result['success']) && array_key_exists('data', $result)) {
+        return ['success' => true, 'data' => $result['data']];
+    }
+
+    return ['success' => false, 'error' => is_string($result['error'] ?? null)
+        ? $result['error']
+        : 'Die Cluster-Informationen konnten nicht geladen werden.'];
+}
+
 function render_header(string $title, string $area): void
 {
     $user = current_user();
-    $nav = [];
-    if ($user !== null) {
-        $nav['user'] = ['/', 'Benutzer-Seite'];
-        $nav['profile'] = ['/profile.php', 'Mein Profil'];
-        if ($user['role'] === 'admin') {
-            $nav['users'] = ['/admin/users.php', 'Admin: Benutzerverwaltung'];
-            $nav['api'] = ['/admin/api.php', 'Admin: API-Info'];
-        }
-    }
+    $isAdmin = $user !== null && $user['role'] === 'admin';
+
     echo '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<title>' . e($title) . ' – prox-web</title>'
-        . '<style>body{font-family:sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem}'
-        . 'nav a{margin-right:1rem}nav a.active{font-weight:bold}label{display:block;margin:.5rem 0}'
+        . '<style>body{font-family:sans-serif;margin:0;padding:0;background:#f3f5f7;color:#1f2933}'
+        . '.layout{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}'
+        . '.sidebar{padding:1.25rem 1rem;border-right:1px solid #d9e2ec;background:#fff}'
+        . '.content{padding:1.5rem 2rem;max-width:900px}'
+        . 'nav{margin-bottom:1.5rem;padding:0}'
+        . 'nav > details{margin-bottom:.75rem}'
+        . 'nav > details:last-child{margin-bottom:0}'
+        . 'nav summary{cursor:pointer;font-weight:700;color:#222;padding:.35rem .5rem;border-radius:.35rem;background:#f1f5f9;list-style:none}'
+        . 'nav summary::-webkit-details-marker{display:none}'
+        . 'nav ul{list-style:none;padding-left:.75rem;margin:.65rem 0 0 0}'
+        . 'nav li{margin:.35rem 0}'
+        . 'nav a{display:block;padding:.4rem .6rem;border-radius:.3rem;text-decoration:none;color:#0b4d8c}'
+        . 'nav a.active{font-weight:bold;background:#e6f0ff;color:#062a58}'
+        . 'nav a:hover{text-decoration:none;background:#eef5ff}'
+        . '.userbar{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.2rem;border-bottom:1px solid #e5e7eb;background:#fff}'
+        . 'label{display:block;margin:.5rem 0}'
         . 'table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.3rem .6rem}</style>'
-        . '</head><body><nav>';
-    foreach ($nav as $key => [$href, $label]) {
-        echo '<a href="' . $href . '"' . ($key === $area ? ' class="active"' : '') . '>' . e($label) . '</a>';
-    }
+        . '</head><body><div class="layout">'
+        . '<aside class="sidebar"><div class="userbar">';
+
     if ($user !== null) {
-        echo '<span>Angemeldet: ' . e($user['username']) . ' '
+        echo '<div><strong>' . e($user['username']) . '</strong></div>'
             . '<form method="post" action="/logout.php" style="display:inline">'
             . '<input type="hidden" name="csrf" value="' . e(csrf_token()) . '">'
-            . '<button>Abmelden</button></form></span>';
+            . '<button type="submit">Abmelden</button></form>';
     }
-    echo '</nav><h1>' . e($title) . '</h1>';
+    echo '</div><nav>';
+
+    if ($user !== null) {
+        echo '<details ' . (in_array($area, ['user', 'profile', 'resources'], true) ? 'open' : '') . '>'
+            . '<summary>Proxmox</summary>'
+            . '<ul>'
+            . '<li><a href="/"' . ($area === 'user' ? ' class="active"' : '') . '>Benutzer-Seite</a></li>'
+            . '<li><a href="/resources.php"' . ($area === 'resources' ? ' class="active"' : '') . '>VMs / LXC / Docker</a></li>'
+            . '<li><a href="/profile.php"' . ($area === 'profile' ? ' class="active"' : '') . '>Mein Profil</a></li>'
+            . '</ul>'
+            . '</details>';
+
+        if ($isAdmin) {
+            echo '<details ' . (in_array($area, ['users', 'api'], true) ? 'open' : '') . '>'
+                . '<summary>Admin</summary>'
+                . '<ul>'
+                . '<li><a href="/admin/users.php"' . ($area === 'users' ? ' class="active"' : '') . '>Benutzerverwaltung</a></li>'
+                . '<li><a href="/admin/api.php"' . ($area === 'api' ? ' class="active"' : '') . '>API-Info</a></li>'
+                . '</ul>'
+                . '</details>';
+        }
+    }
+
+    echo '</nav></aside><main class="content"><h1>' . e($title) . '</h1>';
 }
 
 function render_footer(): void
 {
-    echo '</body></html>';
+    echo '</main></div></body></html>';
 }

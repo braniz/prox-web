@@ -109,6 +109,18 @@ class ProxmoxClientTests(unittest.TestCase):
         with self.assertRaisesRegex(proxmox.ProxmoxError, "TLS-Einstellung"):
             proxmox._connection_details({**self.config, "tls": "vielleicht"})
 
+    def test_extract_resource_ip_handles_common_proxmox_fields(self):
+        resource = {
+            "type": "qemu",
+            "name": "vm1",
+            "ip-address": "10.0.0.42",
+            "net0": "virtio=00:11:22:33:44:55,bridge=vmbr0,ip=dhcp",
+        }
+        self.assertEqual(proxmox.extract_resource_ip(resource), "10.0.0.42")
+
+        resource2 = {"type": "lxc", "name": "ct1", "ip_addresses": ["192.168.1.10", "fe80::1"]}
+        self.assertEqual(proxmox.extract_resource_ip(resource2), "192.168.1.10, fe80::1")
+
     def test_main_reports_error_json_for_incomplete_config(self):
         with patch("sys.stdin", io.StringIO("{}")), patch("sys.stdout", new_callable=io.StringIO) as out:
             code = proxmox.main()
